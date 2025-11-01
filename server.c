@@ -5,45 +5,61 @@
 #include <arpa/inet.h>
 
 int main() {
-    int server_fd, client_fd;
+    int server_socket, client_socket;
     struct sockaddr_in server_addr, client_addr;
+    socklen_t addr_size;
     char buffer[1024];
-    socklen_t addr_len = sizeof(client_addr);
 
     // Create socket
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0) {
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket < 0) {
         perror("Socket creation failed");
-        return 1;
+        exit(1);
     }
 
+    // Configure settings
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(8080);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    // Bind socket to address
-    if (bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    // Bind socket
+    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("Bind failed");
-        return 1;
+        exit(1);
     }
 
-    // Listen for connection
-    listen(server_fd, 1);
+    // Listen for client
+    listen(server_socket, 1);
     printf("Server listening on port 8080...\n");
 
-    // Accept client connection
-    client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &addr_len);
+    addr_size = sizeof(client_addr);
+    client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &addr_size);
     printf("Client connected!\n");
 
-    // Communication
-    recv(client_fd, buffer, sizeof(buffer), 0);
-    printf("Received from client: %s\n", buffer);
+    // Infinite message exchange
+    while (1) {
+        bzero(buffer, sizeof(buffer));
+        read(client_socket, buffer, sizeof(buffer));
 
-    char reply[] = "Hello from server!";
-    send(client_fd, reply, strlen(reply), 0);
-    printf("Reply sent to client.\n");
+        if (strncmp(buffer, "exit", 4) == 0) {
+            printf("Client disconnected.\n");
+            break;
+        }
 
-    close(client_fd);
-    close(server_fd);
+        printf("Client: %s\n", buffer);
+
+        printf("Server: ");
+        bzero(buffer, sizeof(buffer));
+        fgets(buffer, sizeof(buffer), stdin);
+        write(client_socket, buffer, strlen(buffer));
+
+        if (strncmp(buffer, "exit", 4) == 0) {
+            printf("Server exiting...\n");
+            break;
+        }
+    }
+
+    close(client_socket);
+    close(server_socket);
     return 0;
 }
