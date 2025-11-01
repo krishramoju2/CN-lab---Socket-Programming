@@ -5,36 +5,46 @@
 #include <arpa/inet.h>
 
 int main() {
-    int sock;
+    int client_socket;
     struct sockaddr_in server_addr;
-    char message[1024], buffer[1024];
+    char buffer[1024];
 
     // Create socket
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
+    client_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_socket < 0) {
         perror("Socket creation failed");
-        return 1;
+        exit(1);
     }
 
+    // Server info
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(8080);
     server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     // Connect to server
-    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    if (connect(client_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("Connection failed");
-        return 1;
+        exit(1);
+    }
+    printf("Connected to server.\n");
+
+    // Infinite message exchange
+    while (1) {
+        printf("Client: ");
+        bzero(buffer, sizeof(buffer));
+        fgets(buffer, sizeof(buffer), stdin);
+        write(client_socket, buffer, strlen(buffer));
+
+        if (strncmp(buffer, "exit", 4) == 0) {
+            printf("Client exiting...\n");
+            break;
+        }
+
+        bzero(buffer, sizeof(buffer));
+        read(client_socket, buffer, sizeof(buffer));
+        printf("Server: %s\n", buffer);
     }
 
-    printf("Connected to server.\n");
-    printf("Enter message to send: ");
-    fgets(message, sizeof(message), stdin);
-    message[strcspn(message, "\n")] = '\0';  // remove newline
-
-    send(sock, message, strlen(message), 0);
-    recv(sock, buffer, sizeof(buffer), 0);
-    printf("Received from server: %s\n", buffer);
-
-    close(sock);
+    close(client_socket);
     return 0;
 }
